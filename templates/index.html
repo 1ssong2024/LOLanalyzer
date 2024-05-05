@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Summoner Profile</title>
+    <style>
+        .match-dropdown {
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        .summoner-list {
+            display: none;
+            margin-left: 20px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            border: 1px solid #dddddd;
+            text-align: left;
+            padding: 8px;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1>Summoner Profile</h1>
+    <form action="{{ url_for('index') }}" method="post">
+        <label for="puuid">Enter Your PUUID:</label>
+        <input type="text" id="puuid" name="puuid">
+        <button type="submit">Submit</button>
+    </form>
+
+    <!-- Display the summoner name and profile icon if available -->
+    {% if summoner_name %}
+    <h2>{{ summoner_name }}</h2>
+    <img src="{{ profile_icon_url }}" alt="Profile Icon">
+    {% endif %}
+    
+    <!-- Display the list of most recent matches if available -->
+    <h3>Most Recent Matches:</h3>
+    {% if not match_details.empty %}
+    {% for index, match in match_details.iterrows() %}
+    <div class="match-dropdown" onclick="toggleSummonerList('{{ match.match_id }}')">
+        Match ID: {{ match.match_id }}
+        <div class="summoner-list" id="summoner-list-{{ match.match_id }}">
+            <h4>Summoners:</h4>
+            <ul>
+                {% for participant in match.participants %}
+                <li>{{ participant['summonerName'] }}</li>
+                {% endfor %}
+            </ul>
+            <p>Gold to Damage Ratio: {{ match.gold_to_damage_ratio }}</p>
+            {% for i in range(10) %}
+            <p>Name: {{ match['summoner_'+ loop.index0|string]}}</p>
+            <p>Champion: {{ match['champion_'+ loop.index0|string]}}</p>
+            <p>KDA: {{ match['kills_' + loop.index0|string] }}/{{ match['deaths_' + loop.index0|string] }}/{{ match['assist_' + loop.index0|string] }}</p>
+            <p>CS: {{ match['creep_score_' + loop.index0|string] }}</p>
+            {% endfor %}
+        </div>
+        <div class="graph" id="dmggraph-{{ match.match_id }}">
+            <img src="{{ url_for('static', filename='dmggraph_' + match.match_id + '.png') }}" alt="Graph">
+        </div>
+        <div class="graph" id="dmgdealt-{{ match.match_id }}">
+            <img src="{{ url_for('static', filename='dmgdealt_' + match.match_id + '.png') }}" alt="Graph">
+        </div>
+        <div class="graph" id="dmgcontr-{{ match.match_id }}">
+            <img src="{{ url_for('static', filename='dmgcontr_' + match.match_id + '.png') }}" alt="Graph">
+        </div>
+        <div class="graph" id="dmgtaken-{{ match.match_id }}">
+            <img src="{{ url_for('static', filename='dmgtaken_' + match.match_id + '.png') }}" alt="Graph">
+        </div>
+        <div class="graph" id="goldcontr-{{ match.match_id }}">
+            <img src="{{ url_for('static', filename='goldcontr_' + match.match_id + '.png') }}" alt="Graph">
+        </div>
+        <div class="graph" id="totgold-{{ match.match_id }}">
+            <img src="{{ url_for('static', filename='totgold_rb_' + match.match_id + '.png') }}" alt="Graph">
+        </div>
+        <div class="graph" id="xp_rb-{{ match.match_id }}">
+            <img src="{{ url_for('static', filename='xp_rb_' + match.match_id + '.png') }}" alt="Graph">
+        </div>
+        <div class="graph" id="cs_rb-{{ match.match_id }}">
+            <img src="{{ url_for('static', filename='cs_rb_' + match.match_id + '.png') }}" alt="Graph">
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p>No match details available.</p>
+    {% endif %}
+    
+    <!-- Display the DataFrame -->
+    <h3>Match Details:</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Match ID</th>
+                <th>Participant</th>
+                <!-- Add more column headers as needed -->
+            </tr>
+        </thead>
+        <tbody>
+            {% if not match_details.empty %}
+            {% for index, match in match_details.iterrows() %}
+            <tr>
+                <td>{{ match['match_id'] }}</td>
+                <td>{{ match['riot_id'] }}</td>
+                <!-- Add more columns as needed -->
+            </tr>
+            {% endfor %}
+            {% endif %}
+        </tbody>
+    </table>
+
+    <script>
+        function toggleSummonerList(matchId) {
+            var summonerList = document.getElementById('summoner-list-' + matchId);
+            if (summonerList.style.display === 'none') {
+                summonerList.style.display = 'block';
+            } else {
+                summonerList.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
