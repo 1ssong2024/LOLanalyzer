@@ -1,3 +1,4 @@
+import os
 import requests
 #gold over time graph
 import datetime
@@ -16,10 +17,11 @@ matplotlib.use('Agg')
 app = Flask(__name__)
 
 #GAME_LIST = []
-MATCHES = 10
+MATCHES = 5
 COUNTRY = "americas"
 REGION = "NA"
-API_KEY = "RGAPI-55b37958-a7f3-4ec7-9a09-8ab034536d9f"
+API_KEY = "RGAPI-9c987b9f-3e79-4ce1-b069-6c2f0a89d2e4"
+NAME = ""
 cass.set_riot_api_key(API_KEY)
 puuid = "9ydrHSXJcdONbjsFEYZIRxZscA4aDXgc8j4UYhwVhnk-LQlI1aGQXXoNorr0CqQ04O1ckPu0KZ4Gpw"
 #it woudl make sense to have a dictinoary with 
@@ -43,7 +45,16 @@ def get_name_from_puuid(puuid):
     name = gameName+"#"+str(tagLine)
     return gameName, tagLine, name
 
-def get_participant_data(participants, match):
+def get_puuid_from_name(name):
+    gameName = name[:name.index("#")]
+    tagLine = name[name.index("#")+1:]
+    name_url = f'https://{COUNTRY}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{gameName}/{tagLine}'
+    headers = {'X-Riot-Token': API_KEY}
+    name_rsp = requests.get(name_url, headers=headers).json()
+    puuid = name_rsp["puuid"]
+    return puuid
+
+def get_participant_data(participants, match, puuid):
     stats = {}
     stats["match_id"] = str(match.id)
     plist = summoner_data_json("NA1_"+str(match.id))
@@ -51,7 +62,8 @@ def get_participant_data(participants, match):
     for num, p in enumerate(participants):
         num = str(num+1)
         player=p.summoner
-        gameName, tagLine, name = get_name_from_puuid(player.puuid)
+        if player.puuid == puuid: name = NAME
+        else: gameName, tagLine, name = get_name_from_puuid(player.puuid)
         stats["summoner_" + num] = name
         stats["champion_" + num] = plist[int(num)-1]
         stats["position_" + num] = p.individual_position.name
@@ -67,14 +79,6 @@ def get_participant_data(participants, match):
         stats["creep_score_" + num] = p.stats.total_minions_killed
         stats["vision_score_" + num] = p.stats.vision_score
         
-        p_items = []
-        #number_of_item_slots = 6
-        # for i in range(number_of_item_slots):
-        #     try:
-        #         p_items.append(p.stats.items[i].name)
-        #     except AttributeError:
-        #         p_items.append("None")
-        stats["items_"+num] = p_items
     return stats
 
 def summoner_data_json(matchid):
@@ -103,13 +107,14 @@ def timeline_json(match_id):
 #dmg = timeline_json("NA1_4957699488")
 #print(dmg)
 
-def get_summoner_data_by_puuid(summoner):
+def get_summoner_data_by_puuid(summoner, puuid):
     GAME_LIST = []
     matches = summoner.match_history  
     for match in matches[0:MATCHES]:
-        mdata = get_participant_data(match.participants, match)
+        mdata = get_participant_data(match.participants, match, puuid)
         GAME_LIST.append(mdata)
     match_details = pd.DataFrame(GAME_LIST)
+    match_details.to_json(NAME+'.json', orient='records')
     return summoner.profile_icon.id, match_details
 
 def get_timeline_data(gamenum, puuid, region):
@@ -143,8 +148,8 @@ def get_timeline_data(gamenum, puuid, region):
         framedct["frame"] = index
         red_teamgold = 0
         blue_teamgold = 0
-        red_teamdmg = 0
-        blue_teamdmg = 0
+        red_teamdmg = 0.01
+        blue_teamdmg = 0.01
         for participant in frame.participant_frames: #participant 1-10
             dmg = frame1dmg[participant-1]["totalDamageDoneToChampions"]
             dmgtaken = frame1dmg[participant-1]["totalDamageTaken"]
@@ -177,6 +182,10 @@ def get_timeline_data(gamenum, puuid, region):
         TIMELINE.append(framedct)
     #p = match.participants[summoner] #this has a bunch of stuff
     TIMELINE = pd.DataFrame(TIMELINE)
+    for num in range(1,11):
+        player = str(num)
+        TIMELINE["goldcontr_"+player] = TIMELINE['totalgold_'+str(player)]/TIMELINE['totalgold_red' if int(player)<6 else 'totalgold_blue']
+        TIMELINE["dmgcontr_"+player] = TIMELINE['dmg_'+str(player)]/TIMELINE['totaldmg_red' if int(player)<6 else 'totaldmg_blue']
     return TIMELINE
 
 #contribution to totalgold
@@ -193,7 +202,7 @@ def graph_goldcontr(TIMELINE, GAME_LIST, matchind):
         color = red_colors[int(player) - 1] if team == 'red' else blue_colors[int(player) - 6]
         marker = 'o' if team == 'red' else 's'
         markersize = 5
-        plt.plot(TIMELINE['frame'], TIMELINE['totalgold_'+str(player)]/TIMELINE['totalgold_red' if int(player)<6 else 'totalgold_blue'], label=GAME_LIST.at[matchind,"champion_"+player] + ' Total Gold', color=color, marker=marker, markersize=markersize)
+        plt.plot(TIMELINE['frame'], TIMELINE["goldcontr_"+player], label=GAME_LIST.at[matchind,"champion_"+player] + ' Total Gold', color=color, marker=marker, markersize=markersize)
 
     plt.xlabel('Time (Minute)')
     plt.ylabel('Total Gold')
@@ -217,7 +226,7 @@ def graph_dmgcontr(TIMELINE, GAME_LIST, matchind):
         color = red_colors[int(player) - 1] if team == 'red' else blue_colors[int(player) - 6]
         marker = 'o' if team == 'red' else 's'
         markersize = 5
-        plt.plot(TIMELINE['frame'], TIMELINE['dmg_'+str(player)]/TIMELINE['totaldmg_red' if int(player)<6 else 'totaldmg_blue'], label=GAME_LIST.at[matchind,"champion_"+player] + ' Total Damage', color=color, marker=marker, markersize=markersize)
+        plt.plot(TIMELINE['frame'], TIMELINE['dmgcontr_'+str(player)], label=GAME_LIST.at[matchind,"champion_"+player] + ' Total Damage', color=color, marker=marker, markersize=markersize)
 
     plt.xlabel('Time (Minute)')
     plt.ylabel('Proportion of Total Damage')
@@ -245,7 +254,7 @@ def graph_dmgdealt(TIMELINE, GAME_LIST, matchind):
 
     plt.xlabel('Time (Minute)')
     plt.ylabel('Total Damage Dealt')
-    plt.title('Total Damage Dealt of All Players Over Time')
+    plt.title('Total Damage Dealt by All Players Over Time')
     plt.grid(True)
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.subplots_adjust(right=0.75) 
@@ -269,7 +278,7 @@ def graph_dmgtaken(TIMELINE, GAME_LIST, matchind):
 
     plt.xlabel('Time (Minute)')
     plt.ylabel('Total Damage Taken')
-    plt.title('Total Damage Taken of All Players Over Time')
+    plt.title('Total Damage Taken by All Players Over Time')
     plt.grid(True)
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.subplots_adjust(right=0.75) 
@@ -411,6 +420,39 @@ def xp_v_gold(TIMELINE, GAME_LIST, player):
     plt.savefig(f'static/gold_vs_xp_player_{player}.png')
     plt.show()
 
+def goldcontr_v_dmgcontr(TIMELINE, GAME_LIST, matchind):
+    plt.figure(figsize=(10, 6))
+    red_colors = plt.cm.Reds(np.linspace(0.4, 1, 5))  # Different shades of red for red team players
+    blue_colors = plt.cm.Blues(np.linspace(0.4, 1, 5))  # Different shades of blue for blue team players
+    players = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
+    for player in players:
+        x = TIMELINE["goldcontr_" + player]
+        y = TIMELINE["dmgcontr_" + player]
+        print(player)
+        print(x)
+        print(y)
+        team = 'red' if int(player) <= 5 else 'blue'
+        color = red_colors[int(player) - 1] if team == 'red' else blue_colors[int(player) - 6]
+        marker = 'o' if team == 'red' else 's'
+        markersize = 25
+        plt.scatter(x, y, label=GAME_LIST.at[matchind,"champion_"+player], color=color, marker=marker, s=markersize)
+    plt.xlabel('Gold contribution (Player Gold/Team Gold)')
+    plt.ylabel('Damage contribution (Player Damage/Team Damage)')
+    plt.title('Gold contribution vs Damage contribution for All Players')
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.subplots_adjust(right=0.75)
+    plt.grid(True)
+    print(GAME_LIST.at[matchind,"match_id"])
+    plt.savefig(f'static/goldcontr_vs_dmgcontr_{GAME_LIST.at[matchind,"match_id"]}.png')
+    plt.show()
+
+NAME = "zteph#4963"
+match_details = pd.read_json(NAME + ".json")
+# timeline = get_timeline_data(0, puuid, "NA")
+print(match_details["match_id"])
+# print(match_details["champion_5"])
+# print(timeline["dmgcontr_5"])
+# goldcontr_v_dmgcontr(timeline, match_details, 0)
 
 def plot_xp_vs_gold_reg(TIMELINE, GAME_LIST, matchind):
     plt.figure(figsize=(10, 6))
@@ -542,32 +584,49 @@ for i in range(2):
     graph_dmgdealt(timeline, match_details, i)
     graph_dmgtaken(timeline, match_details, i)
 '''
-
+def generate_graphs(timeline, match_details, i):
+    generate_dmg_graph(match_details, i)
+    graph_dmgdealt(timeline, match_details, i)
+    graph_dmgcontr(timeline, match_details, i)
+    graph_dmgtaken(timeline, match_details, i)
+    graph_goldcontr(timeline, match_details, i)
+    graph_totgold_rb(timeline, match_details, i)
+    graph_xp_rb(timeline, match_details, i)
+    graph_cs_rb(timeline, match_details, i)
+    goldcontr_v_dmgcontr(timeline, match_details, i)
 #'''
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    global NAME
     summoner_name = None
     profile_icon_url = None
     match_details = None
 
     if request.method == 'POST':
-        puuid = request.form['puuid']
-        if puuid:
-            gameName, tagLine, summoner_name = get_name_from_puuid(puuid) 
+        NAME = request.form['name']
+        summoner_name = NAME
+        if NAME:
+            puuid = get_puuid_from_name(NAME) 
             summoner = Summoner(puuid=puuid, region=REGION)
-            profile_icon_id, match_details = get_summoner_data_by_puuid(summoner) #match details is summary stats where each line= one game
+            summoner_path = "/Users/stephaniesong/Downloads/LOLanalyzer v1/" + NAME + ".json"
+            if os.path.exists(summoner_path) and summoner_path.endswith('.json'): 
+                print('json located')
+                profile_icon_id, match_details = summoner.profile_icon.id, pd.read_json(NAME + ".json")
+                match_details["match_id"] = match_details["match_id"].astype(str)
+                print(match_details)
+            else:
+                profile_icon_id, match_details = get_summoner_data_by_puuid(summoner, puuid) #match details is summary stats where each line= one game
             if summoner_name:
                 profile_icon_url = f'http://ddragon.leagueoflegends.com/cdn/10.25.1/img/profileicon/{profile_icon_id}.png'
             for i in range(MATCHES):
-                timeline = get_timeline_data(i, puuid, "NA")
-                generate_dmg_graph(match_details, i)
-                graph_dmgdealt(timeline, match_details, i)
-                graph_dmgcontr(timeline, match_details, i)
-                graph_dmgtaken(timeline, match_details, i)
-                graph_goldcontr(timeline, match_details, i)
-                graph_totgold_rb(timeline, match_details, i)
-                graph_xp_rb(timeline, match_details, i)
-                graph_cs_rb(timeline, match_details, i)
+                file_path = "/Users/stephaniesong/Downloads/LOLanalyzer v1/static/dmggraph_"+match_details.at[i,"match_id"]+".png"
+                if os.path.exists(file_path) and file_path.endswith('.png'): 
+                    print("graph exists")
+                    continue
+                else: 
+                    timeline = get_timeline_data(i, puuid, "NA")
+                    generate_graphs(timeline, match_details, i)
+                
     if match_details is None:
         match_details = pd.DataFrame()
     return render_template('index.html', summoner_name=summoner_name, profile_icon_url=profile_icon_url, match_details=match_details)

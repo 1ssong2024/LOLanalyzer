@@ -25,13 +25,31 @@
         th {
             background-color: #f2f2f2;
         }
+        .graph-container {
+            display: none;
+            width: 40%; /* Each graph container takes 40% of the row to leave space for padding */
+            float: left; /* Float elements to left to make them inline */
+            box-sizing: border-box; /* Include padding and border in the element's total width and height */
+            padding: 10px; 
+        }
+        .graph-container img {
+            width: 100%; /* Make the images 100% of their container width */
+            height: auto; /* Automatically adjust the height to maintain aspect ratio */
+            display: block; /* Ensure images are displayed as blocks */
+            margin: 0 auto; /* Center images horizontally within their container */
+        }
+        .row::after {
+        content: "";
+        clear: both; /* Clear float to prevent wrapping */
+        display: table;
+        }
     </style>
 </head>
 <body>
     <h1>Summoner Profile</h1>
     <form action="{{ url_for('index') }}" method="post">
-        <label for="puuid">Enter Your PUUID:</label>
-        <input type="text" id="puuid" name="puuid">
+        <label for="name">Enter Your Game Name and Tagline:</label>
+        <input type="text" id="name" name="name">
         <button type="submit">Submit</button>
     </form>
 
@@ -46,6 +64,7 @@
     {% if not match_details.empty %}
     {% for index, match in match_details.iterrows() %}
     <div class="match-dropdown" onclick="toggleSummonerList('{{ match.match_id }}')">
+        <div class="row"></div>
         Match ID: {{ match.match_id }}
         <div class="summoner-list" id="summoner-list-{{ match.match_id }}">
             <h4>Summoners:</h4>
@@ -56,35 +75,46 @@
             </ul>
             <p>Gold to Damage Ratio: {{ match.gold_to_damage_ratio }}</p>
             {% for i in range(10) %}
-            <p>Name: {{ match['summoner_'+ loop.index0|string]}}</p>
-            <p>Champion: {{ match['champion_'+ loop.index0|string]}}</p>
-            <p>KDA: {{ match['kills_' + loop.index0|string] }}/{{ match['deaths_' + loop.index0|string] }}/{{ match['assist_' + loop.index0|string] }}</p>
-            <p>CS: {{ match['creep_score_' + loop.index0|string] }}</p>
+            <p>Name: {{ match['summoner_'+ loop.index|string]}}</p>
+            <p>Champion: {{ match['champion_'+ loop.index|string]}}</p>
+            <p>KDA: {{ match['kills_' + loop.index|string] }}/{{ match['deaths_' + loop.index|string] }}/{{ match['assist_' + loop.index|string] }}</p>
+            <p>CS: {{ match['creep_score_' + loop.index|string] }}</p>
             {% endfor %}
         </div>
-        <div class="graph" id="dmggraph-{{ match.match_id }}">
-            <img src="{{ url_for('static', filename='dmggraph_' + match.match_id + '.png') }}" alt="Graph">
+        <div class="row"></div>
+            <div class="graph-container" id="dmggraph_{{ match.match_id }}">
+                <img src="{{ url_for('static', filename='dmggraph_' + match.match_id + '.png') }}" alt="Graph">
+            </div>
+            <div class="graph-container" id="dmgdealt_{{ match.match_id }}">
+                <img src="{{ url_for('static', filename='dmgdealt_' + match.match_id + '.png') }}" alt="Graph">
+            </div>
         </div>
-        <div class="graph" id="dmgdealt-{{ match.match_id }}">
-            <img src="{{ url_for('static', filename='dmgdealt_' + match.match_id + '.png') }}" alt="Graph">
+        <div class="row"></div>
+            <div class="graph-container" id="dmgcontr_{{ match.match_id }}">
+                <img src="{{ url_for('static', filename='dmgcontr_' + match.match_id + '.png') }}" alt="Graph">
+            </div>
+            <div class="graph-container" id="dmgtaken_{{ match.match_id }}">
+                <img src="{{ url_for('static', filename='dmgtaken_' + match.match_id + '.png') }}" alt="Graph">
+            </div>
         </div>
-        <div class="graph" id="dmgcontr-{{ match.match_id }}">
-            <img src="{{ url_for('static', filename='dmgcontr_' + match.match_id + '.png') }}" alt="Graph">
+        <div class="row"></div>
+            <div class="graph-container" id="goldcontr_{{ match.match_id }}">
+                <img src="{{ url_for('static', filename='goldcontr_' + match.match_id + '.png') }}" alt="Graph">
+            </div>
+            <div class="graph-container" id="totgold_{{ match.match_id }}">
+                <img src="{{ url_for('static', filename='totgold_rb_' + match.match_id + '.png') }}" alt="Graph">
+            </div>
         </div>
-        <div class="graph" id="dmgtaken-{{ match.match_id }}">
-            <img src="{{ url_for('static', filename='dmgtaken_' + match.match_id + '.png') }}" alt="Graph">
+        <div class="row"></div>
+            <div class="graph-container" id="xp_rb_{{ match.match_id }}">
+                <img src="{{ url_for('static', filename='xp_rb_' + match.match_id + '.png') }}" alt="Graph">
+            </div>
+            <div class="graph-container" id="cs_rb_{{ match.match_id }}">
+                <img src="{{ url_for('static', filename='cs_rb_' + match.match_id + '.png') }}" alt="Graph">
+            </div>
         </div>
-        <div class="graph" id="goldcontr-{{ match.match_id }}">
-            <img src="{{ url_for('static', filename='goldcontr_' + match.match_id + '.png') }}" alt="Graph">
-        </div>
-        <div class="graph" id="totgold-{{ match.match_id }}">
-            <img src="{{ url_for('static', filename='totgold_rb_' + match.match_id + '.png') }}" alt="Graph">
-        </div>
-        <div class="graph" id="xp_rb-{{ match.match_id }}">
-            <img src="{{ url_for('static', filename='xp_rb_' + match.match_id + '.png') }}" alt="Graph">
-        </div>
-        <div class="graph" id="cs_rb-{{ match.match_id }}">
-            <img src="{{ url_for('static', filename='cs_rb_' + match.match_id + '.png') }}" alt="Graph">
+        <div class="graph-container" id="goldcontr_vs_dmgcontr_{{ match.match_id }}">
+            <img src="{{ url_for('static', filename='goldcontr_vs_dmgcontr_' + match.match_id + '.png') }}" alt="Graph">
         </div>
     </div>
     {% endfor %}
@@ -120,8 +150,16 @@
             var summonerList = document.getElementById('summoner-list-' + matchId);
             if (summonerList.style.display === 'none') {
                 summonerList.style.display = 'block';
+                var graphs = document.querySelectorAll('[id*=_' + matchId + ']');
+                graphs.forEach(function(graph) {
+                    graph.style.display = 'block';
+                });
             } else {
                 summonerList.style.display = 'none';
+                var allGraphContainers = document.querySelectorAll('.graph-container');
+                allGraphContainers.forEach(function(graph) {
+                    graph.style.display = 'none';
+                });
             }
         }
     </script>

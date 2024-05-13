@@ -1,0 +1,10 @@
+import os
+import pandas as pd
+NAME = "zteph#4963"
+
+summoner_path = "/Users/stephaniesong/Downloads/LOLanalyzer v1/" + NAME + ".json"
+if os.path.exists(summoner_path) and summoner_path.endswith('.json'): 
+    print('json located')
+    js = pd.read_json(NAME + ".json")
+    print(js)
+    print(js["dmgcontr_1"])
